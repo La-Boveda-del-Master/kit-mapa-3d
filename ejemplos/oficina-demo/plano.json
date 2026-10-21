@@ -1,0 +1,19 @@
+{
+  "dxf": "entrada/plano.dxf",
+  "regiones": [
+    { "id": "piso1", "nivel": "p1", "bbox": [-1000, -3000, 31000, 21000], "origen_dibujo": [0, 0], "origen_m": [0, 0],
+      "edificio": { "cubierta": false, "nombre": "" } },
+    { "id": "piso2", "nivel": "p2", "bbox": [39000, -3000, 71000, 21000], "origen_dibujo": [40000, 0], "origen_m": [0, 0],
+      "edificio": { "cubierta": false, "nombre": "" } },
+    { "id": "piso3", "nivel": "p3", "bbox": [79000, -3000, 111000, 21000], "origen_dibujo": [80000, 0], "origen_m": [0, 0],
+      "edificio": { "cubierta": true, "nombre": "Oficina Demo" } }
+  ],
+  "reglas": [
+    { "capa": "A-EDIFICIO", "tipo": "edificio", "altura": 3.6, "muro_bajo": 1.1, "color": [0.06, 0.46, 0.43], "piso": "piedra_pulida", "fachada": "vidrio", "rotulo_piso": false },
+    { "capa": "A-MUROS", "tipo": "muro", "alto": 2.7, "grosor": 0.12 },
+    { "capa": "A-ESPACIOS", "tipo": "espacio", "altura": 0.04, "capa_textos": "A-TEXTOS", "codigo": "^P[0-9]", "rotulo": "nombre",
+      "color": [0.78, 0.86, 0.90], "categoria": "Sala" },
+    { "capa": "A-MOBILIARIO", "tipo": "caja", "alto": 0.75, "material": "madera_clara" },
+    { "capa": "A-TEXTOS", "tipo": "texto" }
+  ]
+}

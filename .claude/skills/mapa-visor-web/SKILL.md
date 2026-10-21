@@ -1,20 +1,21 @@
 ---
 name: mapa-visor-web
-description: Exporta el modelo 3D a una página web (three.js + GLB con Draco + datos.json), la prueba en local y en tamaño celular, y la publica en Vercel, Netlify o GitHub Pages, o la embebe en otra web con un iframe. Úsalo en la fase 4 del mapa 3D o cuando el visor cargue mal, pese mucho o muestre una versión vieja.
+description: Exporta el modelo 3D a un mapa web navegable (three.js + GLB con Draco + datos.json) con marca propia, modo Por niveles, lugares, buscador de espacios, brújula y links directos. Lo prueba en local y en tamaño celular, y lo publica en Vercel, Netlify o GitHub Pages, o lo embebe con un iframe. Úsalo en la fase 4, o cuando el visor cargue mal, pese mucho o muestre una versión vieja.
 ---
 
-# Visor web del mapa
+# Mapa web 3D
 
 ## 1. Exportar
 
 ```
-blender -b proyectos/<id>/salida/modelo.blend --python pipeline/exportar_web.py -- proyectos/<id>/recinto.json
+blender -b proyectos/<id>/salida/modelo.blend --python pipeline/exportar_web.py -- proyectos/<id>/mapa.json
 ```
 
 Sale `proyectos/<id>/salida/web/`, una carpeta **estática y autocontenida**:
 - `index.html`, `app.js`, `estilos.css`: copiados de `visor/`, con título y versión sellados;
 - `mapa.glb`: el modelo con Draco;
-- `datos.json`: títulos, niveles, pines y stands;
+- `datos.json`: marca, niveles, lugares y espacios;
+- el logo, si `marca.logo` existe;
 - `draco/`: el decodificador local, que no depende de un CDN.
 
 El script imprime triángulos y MB. **Meta: menos de 10 MB.** Si pasa de 12, avisa (ver `docs/PROBLEMAS.md` → peso).
@@ -30,10 +31,11 @@ Abre http://localhost:8765 con el navegador integrado (`preview_start` con la ur
 2. **Exterior**: se ven cubiertas y rótulos; los pines de niveles `bajo_techo` no aparecen.
 3. **Por niveles**: los niveles con `separacion` suben, las cubiertas desaparecen y se ve el interior.
 4. Tocar un pin de la lista: la cámara vuela al lugar, y cambia sola a "Por niveles" si el lugar está tapado.
-5. **Stands**: la pestaña aparece si hay stands con código. Prueba el buscador ("a5" debe encontrar A05) y que la
-   cámara vuele al stand.
+5. **Espacios**: la pestaña (con el nombre de `marca.etiqueta_espacios`) aparece si hay espacios con código. Prueba el
+   buscador ("a5" debe encontrar A05; un nombre debe filtrar) y que la cámara vuele al espacio.
 6. **Celular**: `resize_window` en `mobile`. El panel pasa a hoja inferior y los botones no tapan el mapa.
-7. **Enlaces directos**: `?lugar=3` y `?stand=A12` abren el mapa ya enfocado (sirven para QR en el recinto).
+7. **Enlaces directos**: `?lugar=3` y `?espacio=A12` abren el mapa ya enfocado (sirven para QR en cada puerta o sala).
+8. **Brújula**: gira con la cámara; al tocarla vuelve con el norte arriba.
 
 Luego vuelve el navegador a escritorio. Muéstrale a la persona una captura o el link local.
 
@@ -52,10 +54,10 @@ Después de publicar, abre el link real y repite la prueba 1–5.
 ## 4. Personalizar el visor
 
 Todo el visor está en `visor/`; las copias en `salida/web/` se sobrescriben en cada exportación.
-- **Colores de marca**: variables `--tinta` y `--rojo` en `visor/estilos.css`.
-- **Logo** en la pantalla de carga: agrégalo en `index.html` dentro de `#carga` y copia el archivo a `salida/web/`.
-- **Textos**: `evento.titulo`, `evento.subtitulo`, `evento.nota` y `evento.titulo_lista` en recinto.json.
-- **Vista inicial y distancias**: `vistaInicial()` en `app.js` (ángulos 72° / 34°, escala con el radio del recinto).
+- **Marca sin tocar código**: `marca.titulo`, `subtitulo`, `nota`, `color` (acento), `logo`, `etiqueta_lugares` y
+  `etiqueta_espacios` en mapa.json.
+- **Más a fondo**: variables CSS en `visor/estilos.css` (`--tinta`, `--acento`, `--panel`, `--radio`) y tipografía.
+- **Vista inicial y distancias**: `vistaInicial()` en `app.js` (ángulos 72° / 34°, escala con el tamaño del lugar).
 
 ## 5. Si algo falla
 

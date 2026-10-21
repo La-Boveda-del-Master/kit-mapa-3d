@@ -15,10 +15,11 @@
 </script>
 </head>
 <body>
-<canvas id="lienzo" aria-label="Mapa 3D del recinto"></canvas>
+<canvas id="lienzo" aria-label="Mapa 3D"></canvas>
 <div id="pines" aria-hidden="true"></div>
 
 <header class="marca">
+  <img class="logo" alt="" hidden>
   <div class="marca-txt">
     <strong id="titulo">__TITULO__</strong>
     <span id="subtitulo">__SUBTITULO__</span>
@@ -29,6 +30,10 @@
   <button id="modo-exterior" role="tab" aria-selected="true" class="activo">Exterior</button>
   <button id="modo-niveles" role="tab" aria-selected="false">Por niveles</button>
 </nav>
+
+<button id="btn-norte" class="brujula" title="Norte arriba" aria-label="Poner el norte arriba">
+  <svg id="brujula-aguja" viewBox="0 0 24 24" width="24" height="24"><path d="M12 2.5 15.5 12h-7z" fill="var(--acento)"/><path d="M12 21.5 8.5 12h7z" fill="#9aa0a8"/><text x="12" y="7.6" font-size="0" fill="#fff">N</text></svg>
+</button>
 
 <div class="controles">
   <button id="btn-inicio" title="Volver a la vista inicial" aria-label="Volver a la vista inicial">
@@ -42,25 +47,26 @@
   </button>
 </div>
 
-<aside id="panel" class="panel" aria-label="Lugares del recinto">
+<aside id="panel" class="panel" aria-label="Lugares">
   <button id="panel-asa" class="panel-asa" aria-expanded="false">
     <span class="asa-barra"></span>
     <span id="asa-txt">Lugares</span>
   </button>
   <div id="capas" class="capas" role="tablist" hidden>
     <button id="capa-lugares" role="tab" aria-selected="true" class="activo">Lugares</button>
-    <button id="capa-stands" role="tab" aria-selected="false">Stands</button>
+    <button id="capa-espacios" role="tab" aria-selected="false">Espacios</button>
   </div>
-  <input id="buscar" class="buscar" type="search" placeholder="Buscar stand por código o nombre" hidden>
+  <input id="buscar" class="buscar" type="search" placeholder="Buscar por código o nombre" hidden>
   <div id="ficha" class="ficha" hidden></div>
   <ol id="lista" class="lista"></ol>
-  <ol id="lista-stands" class="lista" hidden></ol>
+  <ol id="lista-espacios" class="lista" hidden></ol>
   <p id="nota" class="nota"></p>
 </aside>
 
 <p id="ayuda" class="ayuda">Arrastra para girar · rueda o pellizco para acercar · toca un número</p>
 
 <div id="carga" class="carga">
+  <img class="logo" alt="" hidden>
   <strong>__TITULO__</strong>
   <span>Cargando mapa 3D…</span>
   <div class="barra"><i id="carga-barra"></i></div>

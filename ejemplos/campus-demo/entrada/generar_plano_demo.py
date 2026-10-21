@@ -1,7 +1,7 @@
 """Genera entrada/plano.pdf: un plano tecnico de juguete para probar pipeline/extraer_plano.py.
 
 Imita lo que trae un plano real: cuadricula de fondo de 1 m como imagen, contorno del pabellon,
-stands rellenos de rosado con su codigo y su medida ("5x6"), y sillas como cuadritos grises.
+locales rellenos de rosado con su codigo y su medida ("5x6"), y sillas como cuadritos grises.
 Escala: 10 pt = 1 m. El punto (100, 900) del PDF es el origen (0, 0) del mundo.
 """
 import pathlib
@@ -20,8 +20,8 @@ page.insert_image(page.rect, pixmap=pix)
 # contorno del Pabellon A (42 x 70 m)
 x0, y0 = P(0, 70); x1, y1 = P(42, 0)
 page.draw_rect(pymupdf.Rect(x0, y0, x1, y1), color=(0, 0, 0), width=2)
-page.insert_text((x0 + 4, y0 + 14), 'PABELLON A', fontsize=10)
-# fila de stands A10..A15 (5 x 6 m)
+page.insert_text((x0 + 4, y0 + 14), 'EDIFICIO A', fontsize=10)
+# fila de locales A10..A15 (5 x 6 m)
 for i in range(6):
     a = P(4 + i * 6, 20); b = P(9 + i * 6, 14)
     r = pymupdf.Rect(a[0], a[1], b[0], b[1])

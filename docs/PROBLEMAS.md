@@ -1,6 +1,6 @@
 # Problemas conocidos y cómo se resolvieron
 
-Todo esto pasó de verdad en el mapa de Plaza Mayor (Feria Effix 2026).
+La mayoría salió del caso de origen (`docs/CASO-ORIGEN.md`). El resto, de construir y probar el kit.
 
 ## Plano y escala
 
@@ -11,7 +11,11 @@ Todo esto pasó de verdad en el mapa de Plaza Mayor (Feria Effix 2026).
 | Pisos dibujados uno al lado del otro | Así los pone el plano; en realidad van apilados | Misma planta, distinto nivel, `separacion` en el de arriba |
 | Zona sin cuadrícula | El recuadro no la trae | Deducir la escala de algo repetido conocido (columnas cada 7,2 m, una tarima de 5×3) |
 | Dos fuentes dan medidas distintas | PDF de montaje frente a plano oficial | Preguntar cuál manda y anotarlo; no promediar |
-| Stand sin código | El texto quedó fuera del rectángulo | Patrón `codigo` más flexible o poner el código a mano |
+| Espacio sin código | El texto quedó fuera del polígono | Patrón `codigo` más flexible o poner el código a mano |
+| DXF sin unidad ($INSUNITS = 0) | El archivo no la declara | Preguntar si es mm, cm o m y poner `unidad_m` en plano.json |
+| Muros de CAD como dos líneas | Así se dibujan los muros en CAD | `grosor` 0,05–0,08: las dos líneas quedan como las caras del muro |
+| Mobiliario de CAD no aparece | Viene en bloques (INSERT) | Explotar los bloques en CAD antes de exportar |
+| Imagen torcida o en perspectiva | Foto tomada en ángulo | Enderezarla antes de calibrar |
 
 ## Modelo (Blender)
 
@@ -35,14 +39,26 @@ Todo esto pasó de verdad en el mapa de Plaza Mayor (Feria Effix 2026).
 | Pines que se quedan atrás al girar | `transition` CSS en la posición del pin | Sin transición en `transform`; recolocar en el mismo cuadro del render |
 | Visor en 0×0 en algunos celulares | Se midió antes de tener tamaño | Ignorar tamaños menores de 50 px; `ResizeObserver` con respaldo `resize`/`orientationchange` |
 | Lento en celular | Píxeles, sombras y llamadas de dibujo | `pixelRatio ≤ 1,5` en táctil, sombra de 2048 y estática, render solo si algo cambió, mallas unidas |
-| Stands repetidos en la búsqueda | El mismo código en varios polígonos | Deduplicar por código y quedarse con el más grande (ya en `extraer_plano`) |
+| Espacios repetidos en la búsqueda | El mismo código en varios polígonos | Deduplicar por código (ya lo hacen `extraer_plano` y el exportador) |
+| El buscador no filtra | Atributo `hidden` anulado por `display: grid` | `.lista li[hidden] { display: none }` (ya en el visor) |
+
+## Renders
+
+| Síntoma | Causa | Arreglo |
+|---|---|---|
+| Esquinas vacías o cielo detrás del terreno | El encuadre ve más allá del terreno | Ya resuelto con el piso infinito; con `--transparente` no aplica |
+| Maqueta blanca lavada | Exposición alta | Ya ajustado (−0,6); si se ve plano, sube la energía del sol en `cielo()` |
+| Grano o ruido | Pocas muestras | `--muestras=128` o más, o `--motor=cycles` |
+| Textos que se salen del espacio | Nombre largo en un espacio angosto | El tamaño ya se ajusta solo; si no alcanza, usa un `rotulo` corto o `tam_rotulo` |
+| Texto invisible en un espacio plano | Quedaba debajo de la losa | Ya resuelto: los espacios planos se apoyan a 13 cm |
+| Cycles no aparece en Blender 5 | Es un addon | `renders.py` lo activa solo |
 
 ## Peso del modelo
 
-Meta: **≤ 10 MB** de GLB. Plaza Mayor quedó en 8,3 MB con ~930.000 triángulos y Draco nivel 6. Si te pasas:
+Meta: **≤ 10 MB** de GLB. El caso de origen quedó en 8,3 MB con ~930.000 triángulos y Draco nivel 6. Si te pasas:
 
 1. Sillas: son miles de cajas. Bájales detalle o quítalas de los salones que no importan.
-2. Textos: el exportador ya une los códigos de stand por nivel; los rótulos sueltos suman.
+2. Textos: el exportador ya une los códigos de los espacios por nivel; los rótulos sueltos suman.
 3. Árboles, vehículos y personas: menos instancias.
 4. Texturas: 512 px está bien para el visor; no subas a 2048.
 5. Revisa `tris` en la salida del exportador después de cada cambio grande.

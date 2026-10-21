@@ -1,11 +1,9 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "visor-demo",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "ejemplos/demo-centro-eventos/salida/web"],
-      "port": 8765
-    }
+    { "name": "visor-campus", "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "ejemplos/campus-demo/salida/web"], "port": 8765 },
+    { "name": "visor-oficina", "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8766", "--directory", "ejemplos/oficina-demo/salida/web"], "port": 8766 }
   ]
 }

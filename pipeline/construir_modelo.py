@@ -1,19 +1,19 @@
-"""Construye el modelo 3D de un recinto en Blender a partir de recinto.json (1 unidad = 1 metro).
+"""Construye el modelo 3D en Blender a partir de mapa.json (1 unidad = 1 metro).
 
 Uso:
   python pipeline/generar_texturas.py                                   # una sola vez
-  blender -b --factory-startup --python pipeline/construir_modelo.py -- proyectos/<recinto>/recinto.json
+  blender -b --factory-startup --python pipeline/construir_modelo.py -- proyectos/<id>/mapa.json
 
-Salida: proyectos/<recinto>/salida/modelo.blend
+Salida: proyectos/<id>/salida/modelo.blend
+Mundo: +X Este, +Y Norte, Z arriba. Formato del JSON: docs/FORMATO-MAPA.md.
 
-Mundo: +X Este, +Y Norte, Z arriba. Formato del JSON: docs/FORMATO-RECINTO.md.
-
-Grupos (propiedad `grupo` de cada objeto, la usan el exportador y el visor):
-  <nivel>        piso, muros bajos, stands, mobiliario del nivel. Se ve en los dos modos.
-  techo_<nivel>  cubiertas y muros altos. El visor los oculta en el modo "Por niveles" para ver adentro.
-  entorno        terreno, vias, arboles. Siempre visible.
-Cada nivel con "separacion" > 0 cuelga de un vacio RAIZ_<nivel>; el visor lo sube esa cantidad de metros
-en el modo "Por niveles" para que se vea lo que hay debajo.
+Grupos (propiedad `grupo` de cada objeto; la usan el exportador, los renders y el visor):
+  <nivel>        piso, muros bajos e interiores, espacios, mobiliario del nivel. Se ve siempre.
+  techo_<nivel>  cubiertas y muros altos. Se ocultan en el modo "Por niveles" para ver adentro.
+  entorno        terreno, vias, arboles.
+  calco          imagen del plano bajo el modelo, para revisar (no se exporta a la web).
+Cada nivel con "separacion" > 0 cuelga de un vacio RAIZ_<nivel>; el visor y los renders lo suben esa
+cantidad de metros en el modo "Por niveles" para dejar ver lo que hay debajo.
 """
 import bpy, bmesh, json, math, random, sys, pathlib
 import numpy as np
@@ -21,7 +21,7 @@ import numpy as np
 KIT = pathlib.Path(__file__).resolve().parent.parent
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 if not argv:
-    raise SystemExit('Falta la ruta de recinto.json:  blender -b --factory-startup --python pipeline/construir_modelo.py -- proyectos/x/recinto.json')
+    raise SystemExit('Falta la ruta de mapa.json:  blender -b --factory-startup --python pipeline/construir_modelo.py -- proyectos/x/mapa.json')
 CFG_PATH = pathlib.Path(argv[0]).resolve()
 CFG = json.loads(CFG_PATH.read_text(encoding='utf8'))
 PROY = CFG_PATH.parent
@@ -32,16 +32,18 @@ if not (TEX / 'concreto.jpg').exists():
     raise SystemExit('No hay texturas. Corre primero:  python pipeline/generar_texturas.py')
 random.seed(CFG.get('semilla', 2026))
 
-# stands extraidos del plano (pipeline/extraer_plano.py) que se suman a los escritos a mano
-for rel in ([CFG['stands_desde']] if isinstance(CFG.get('stands_desde'), str) else CFG.get('stands_desde', [])):
+CFG.setdefault('espacios', []).extend(CFG.pop('stands', []))          # nombre antiguo
+# geometria extraida del plano (pipeline/extraer_plano.py) que se suma a la escrita a mano
+for rel in ([CFG['importar']] if isinstance(CFG.get('importar'), str) else CFG.get('importar', [])):
     extra = json.loads((PROY / rel).read_text(encoding='utf8'))
-    for k in ('stands', 'objetos', 'zonas'):
+    for k in ('espacios', 'objetos', 'zonas', 'muros', 'edificios'):
         CFG.setdefault(k, []).extend(extra.get(k, []))
+    CFG['espacios'].extend(extra.get('stands', []))
 
 NIV = {n['id']: n for n in CFG['niveles']}
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene = bpy.context.scene
-scene.name = CFG.get('id', 'recinto')
+scene.name = CFG.get('id', 'mapa')
 scene.unit_settings.system = 'METRIC'
 
 # ---------------------------------------------------------------- colecciones y raices de nivel
@@ -96,9 +98,9 @@ def mat(name, col, rough=.75, metal=0., emit=None, alpha=1., strength=1.):
     return m
 
 
-def img(file, data=False):
+def img(file, data=False, ruta=None):
     if file not in _IMG:
-        im = bpy.data.images.load(str(TEX / (file + '.jpg')))
+        im = bpy.data.images.load(str(ruta or (TEX / (file + '.jpg'))))
         if data:
             im.colorspace_settings.name = 'Non-Color'
         _IMG[file] = im
@@ -138,11 +140,12 @@ def led_mat(name, file, strength=2.2):
     t = nt.nodes.new('ShaderNodeTexImage'); t.image = img(file); t.extension = 'EXTEND'
     nt.links.new(t.outputs['Color'], b.inputs['Emission Color']); b.inputs['Emission Strength'].default_value = strength
     m.diffuse_color = (.35, .2, .8, 1)
+    m['led'] = True
     MATS[name] = m; TILE[name] = 1.0
     return m
 
 
-# materiales por nombre que se pueden pedir desde recinto.json ("piso", "material", "fachada")
+# materiales por nombre que se pueden pedir desde mapa.json ("piso", "material", "fachada")
 CATALOGO = {
     'concreto': lambda: tex_mat('concreto', 'concreto', 4.8, .8, avg=(.74, .73, .70)),
     'concreto_pulido': lambda: tex_mat('concreto_pulido', 'concreto_pulido', 6, .35, .05, avg=(.60, .60, .60)),
@@ -159,7 +162,8 @@ CATALOGO = {
     'arenisca_muro': lambda: tex_mat('arenisca_muro', 'arenisca_muro', 4.8, .85, normal='arenisca_muro_n', nstr=.7, avg=(.76, .68, .54)),
     'ladrillo': lambda: tex_mat('ladrillo', 'ladrillo', 2.0, .85, normal='ladrillo_n', nstr=.8, avg=(.60, .29, .17)),
     'vidrio': lambda: mat('vidrio', (.55, .70, .78), .05, 0, None, .35),
-    'blanco': lambda: mat('blanco', (.95, .95, .94), .5),
+    'blanco': lambda: mat('blanco', (.92, .92, .91), .55),
+    'muro_interior': lambda: mat('muro_interior', (.90, .89, .86), .7),
     'negro': lambda: mat('negro', (.06, .06, .07), .5),
 }
 
@@ -174,20 +178,22 @@ def material(nombre, defecto='concreto'):
 
 
 M = {
-    'stand_lado': mat('stand_panel', (.96, .95, .93), .6), 'silla': mat('silla', (.18, .19, .21), .6),
+    'espacio_lado': mat('espacio_panel', (.96, .95, .93), .6), 'silla': mat('silla', (.18, .19, .21), .6),
     'tarima': mat('tarima', (.08, .08, .09), .5), 'faldon': mat('faldon_tarima', (.04, .04, .05), .9),
     'tronco': mat('tronco', (.32, .22, .14), .9), 'copa': tex_mat('copa', 'follaje', 3.0, .9, avg=(.20, .45, .12)),
     'lona': mat('lona_carpa', (.96, .95, .92), .7), 'alu': mat('truss_aluminio', (.78, .80, .82), .3, .9),
     'rotulo': mat('rotulo', (.08, .08, .10), .6), 'rotulo_claro': mat('rotulo_claro', (.97, .97, .97), .6),
-    'led': led_mat('pantalla_led', 'led_wide'),
+    'led': led_mat('pantalla_led', 'led_wide'), 'escalon': mat('escalon', (.70, .70, .68), .7),
+    'baranda': mat('baranda', (.55, .57, .60), .35, .8),
 }
 
 
 def color_pab(c):
     """Fachada de panel y cubierta metalica tenidas con el color del edificio."""
     k = '%.2f_%.2f_%.2f' % tuple(c)
-    return (tex_mat('muro_' + k, 'panel_gris', 4.8, .55, .25, normal='panel_n', nstr=.5, tint=tuple(min(1, v * 1.25) for v in c)),
-            tex_mat('techo_' + k, 'techo_gris', 3.6, .4, .45, normal='techo_n', tint=tuple(min(1, v * 1.25) for v in c)))
+    t = tuple(min(1, v * 1.25) for v in c)
+    return (tex_mat('muro_' + k, 'panel_gris', 4.8, .55, .25, normal='panel_n', nstr=.5, tint=t),
+            tex_mat('techo_' + k, 'techo_gris', 3.6, .4, .45, normal='techo_n', tint=t))
 
 
 # ---------------------------------------------------------------- geometria
@@ -201,6 +207,10 @@ def ccw(p):
 
 def centroid(p):
     return sum(a for a, _ in p) / len(p), sum(b for _, b in p) / len(p)
+
+
+def lerp(a, b, t):
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
 
 
 class MB:
@@ -235,17 +245,18 @@ class MB:
             return
         s.box(((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, z0), (L + w * .98, w, h), m, math.atan2(b[1] - a[1], b[0] - a[0]), top)
 
-    def walls(s, poly, z0, h, t, m, gaps=None):
-        """Muros por el contorno. gaps = {indice_lado: [(desde_m, hasta_m), ...]} deja vanos (puertas)."""
+    def walls(s, poly, z0, h, t, m, gaps=None, cerrado=True, top=None):
+        """Muros por una linea. gaps = {indice_tramo: [(desde_m, hasta_m), ...]} deja vanos (puertas)."""
         n = len(poly)
-        for i in range(n):
+        for i in range(n if cerrado else n - 1):
             a, b = poly[i], poly[(i + 1) % n]
             L = math.dist(a, b)
-            cuts = sorted((gaps or {}).get(i, []))
+            if L < 1e-3:
+                continue
             t0 = 0.0
-            for g0, g1 in cuts + [(L, L)]:
+            for g0, g1 in sorted((gaps or {}).get(i, [])) + [(L, L)]:
                 if g0 > t0 + .05:
-                    s.seg(lerp(a, b, t0 / L), lerp(a, b, g0 / L), t, z0, h, m)
+                    s.seg(lerp(a, b, t0 / L), lerp(a, b, g0 / L), t, z0, h, m, top)
                 t0 = max(t0, g1)
 
     def led(s, c, ancho, alto, z0, rz, grosor=.3):
@@ -292,10 +303,6 @@ class MB:
         return link(bpy.data.objects.new(name, me), grupo)
 
 
-def lerp(a, b, t):
-    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
-
-
 def link(ob, grupo):
     coll(grupo).objects.link(ob)
     ob['grupo'] = grupo
@@ -319,25 +326,40 @@ def z_nivel(nid):
 
 
 # ---------------------------------------------------------------- terreno
-pts = [p for e in CFG.get('edificios', []) for p in e['poligono']] + [p for z in CFG.get('zonas', []) for p in z['poligono']]
+pts = [p for k in ('edificios', 'zonas') for e in CFG.get(k, []) for p in e['poligono']] + \
+      [p for m in CFG.get('muros', []) for p in m['puntos']]
 if not pts:
-    raise SystemExit('recinto.json no tiene edificios ni zonas.')
+    raise SystemExit('mapa.json no tiene edificios, zonas ni muros.')
 xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
 T = CFG.get('terreno', {})
 mg = float(T.get('margen', 80))
 x0, x1, y0, y1 = min(xs) - mg, max(xs) + mg, min(ys) - mg, max(ys) + mg
-zt = min(z_nivel(n) for n in NIV) - .05 if T.get('bajo_todo') else -.05
-mb = MB()
-mb.prism([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], zt - .3, .3, material(T.get('material', 'concreto')))
-for v in T.get('vias', []):                           # [[x, y], [x, y], ancho]
-    mb.seg(v[0], v[1], v[2], zt, .04, material('asfalto'))
-mb.build('Terreno', 'entorno')
+zt = -.05
+if T.get('material', 'concreto') != 'ninguno':
+    mb = MB()
+    mb.prism([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], zt - .3, .3, material(T.get('material', 'concreto')))
+    for v in T.get('vias', []):                       # [[x, y], [x, y], ancho]
+        mb.seg(v[0], v[1], v[2], zt, .04, material('asfalto'))
+    mb.build('Terreno', 'entorno')
 
-# ---------------------------------------------------------------- zonas planas (plazas, jardines, tapetes, agua)
+# calco: la imagen del plano bajo el modelo para comparar (renders con --calco)
+if CFG.get('calco'):
+    c = CFG['calco']; ruta = PROY / c['imagen']
+    im = img('calco', ruta=ruta); W, H = im.size
+    ppm = float(c['px_por_m']); ox, oy = c.get('origen_px', [0, H]); omx, omy = c.get('origen_m', [0, 0])
+    xa, xb = omx - ox / ppm, omx + (W - ox) / ppm; ya, yb = omy - (H - oy) / ppm, omy + oy / ppm
+    me = bpy.data.meshes.new('Calco'); me.from_pydata([(xa, ya, .02), (xb, ya, .02), (xb, yb, .02), (xa, yb, .02)], [], [(0, 1, 2, 3)])
+    me.uv_layers.new(name='UVMap').data.foreach_set('uv', [0, 0, 1, 0, 1, 1, 0, 1])
+    m = bpy.data.materials.new('calco'); m.use_nodes = True; t = m.node_tree.nodes.new('ShaderNodeTexImage'); t.image = im
+    b = bsdf(m); m.node_tree.links.new(t.outputs['Color'], b.inputs['Emission Color']); b.inputs['Emission Strength'].default_value = 1
+    b.inputs['Base Color'].default_value = (0, 0, 0, 1); me.materials.append(m)
+    ob = bpy.data.objects.new('Calco', me); link(ob, 'calco'); ob.hide_render = True
+
+# ---------------------------------------------------------------- zonas planas (plazas, jardines, agua, tapetes, areas)
 for z in CFG.get('zonas', []):
     g = z.get('nivel', 'base'); h = float(z.get('alto', .06))
-    mb = MB(); mb.prism(z['poligono'], z_nivel(g) + float(z.get('z', 0)), h, material(z.get('material'), 'pav_plaza'))
-    mb.build('Zona_' + z.get('id', 'x'), g)
+    mb = MB(); mb.prism(z['poligono'], z_nivel(g) + float(z.get('z', 0)), h, material(z.get('material') or z.get('color'), 'pav_plaza'))
+    mb.build('Zona_' + str(z.get('id', 'x')), g)
     if z.get('rotulo'):
         c = centroid(z['poligono'])
         texto(z['rotulo'], c, z_nivel(g) + h, float(z.get('tam_rotulo', 2.4)), M['rotulo'], g, math.radians(z.get('rot_rotulo', 0)))
@@ -353,42 +375,68 @@ for e in CFG.get('edificios', []):
     piso_m = material(e.get('piso'), 'concreto_pulido')
     bajo = min(H, float(e.get('muro_bajo', 3.2)))
     t = float(e.get('grosor_muro', .4))
-    # vanos de puertas: lados contados desde el primer vertice del poligono ya en sentido antihorario
     gaps = {}
     for p in e.get('puertas', []):
         gaps.setdefault(int(p['lado']), []).append((p['centro'] - p['ancho'] / 2, p['centro'] + p['ancho'] / 2))
     mb = MB()
-    mb.prism(poly, z0, .12, piso_m)                                  # losa de piso
+    if e.get('losa', True):
+        mb.prism(poly, z0, .12, piso_m)                              # losa de piso
     mb.walls(poly, z0, bajo, t, muro_m, gaps)                        # muro bajo: se ve en "Por niveles"
-    mb.build('Edif_' + e['id'], g)
-    if e.get('cubierta', True) and H > bajo:
+    mb.build('Edif_' + str(e['id']), g)
+    if H > bajo and e.get('muros_altos', True):
         mb = MB()
-        mb.walls(poly, z0 + bajo, H - bajo, t, muro_m)               # muro alto
-        mb.prism(poly, z0 + H, .25, techo_m)                         # cubierta
-        mb.build('Techo_' + e['id'], 'techo_' + g)
-    if e.get('rotulo', True):
-        c = centroid(poly); rz = math.radians(e.get('rot_rotulo', 0)); tam = float(e.get('tam_rotulo', 3.5))
-        texto(e['nombre'], c, z0 + .12, tam, M['rotulo'], g, rz, 'Rotulo_piso_' + e['id'])
+        mb.walls(poly, z0 + bajo, H - bajo, t, muro_m)               # muro alto: se oculta en "Por niveles"
+        if e.get('ventanas', True) and H - bajo > 1.6:               # franja de vidrio continua: da escala y lectura de fachada
+            mb.walls(poly, z0 + bajo + .4, min(1.4, H - bajo - .6), t + .06, material('vidrio'))
         if e.get('cubierta', True):
-            texto(e['nombre'], c, z0 + H + .25, tam * 1.6, M['rotulo_claro'], 'techo_' + g, rz, 'Rotulo_techo_' + e['id'])
+            mb.prism(poly, z0 + H, .25, techo_m)                     # cubierta
+        mb.build('Techo_' + str(e['id']), 'techo_' + g)
+    if e.get('rotulo', True) and e.get('nombre'):
+        c = centroid(poly); rz = math.radians(e.get('rot_rotulo', 0))
+        xs_, ys_ = [q[0] for q in poly], [q[1] for q in poly]
+        corto = min(max(xs_) - min(xs_), max(ys_) - min(ys_)); largo = max(max(xs_) - min(xs_), max(ys_) - min(ys_))
+        tam = float(e.get('tam_rotulo', min(3.5, corto * .16, largo * 1.1 / max(4, len(e['nombre'])))))
+        if e.get('rotulo_piso', True):
+            texto(e['nombre'], c, z0 + .12, tam, M['rotulo'], g, rz, 'Rotulo_piso_' + str(e['id']))
+        if e.get('cubierta', True):
+            texto(e['nombre'], c, z0 + H + .25, tam * 1.4, M['rotulo_claro'], 'techo_' + g, rz, 'Rotulo_techo_' + str(e['id']))
 
-# ---------------------------------------------------------------- stands
+# ---------------------------------------------------------------- muros sueltos (tabiques interiores, cerramientos)
 por_nivel = {}
-for s in CFG.get('stands', []):
+for w in CFG.get('muros', []):
+    por_nivel.setdefault(w.get('nivel', 'base'), []).append(w)
+for g, lista in por_nivel.items():
+    mb = MB()
+    for w in lista:
+        gaps = {}
+        for p in w.get('puertas', []):
+            gaps.setdefault(int(p.get('tramo', 0)), []).append((p['centro'] - p['ancho'] / 2, p['centro'] + p['ancho'] / 2))
+        mb.walls(w['puntos'], z_nivel(g) + float(w.get('z', 0)), float(w.get('alto', 2.6)), float(w.get('grosor', .15)),
+                 material(w.get('material'), 'muro_interior'), gaps, bool(w.get('cerrado', False)))
+    mb.build('Muros_' + g, g)
+
+# ---------------------------------------------------------------- espacios (stands, locales, oficinas, salas, lotes)
+por_nivel = {}
+for s in CFG.get('espacios', []):
     por_nivel.setdefault(s.get('nivel', 'base'), []).append(s)
 for g, lista in por_nivel.items():
     mb = MB()
     for s in lista:
-        z0 = z_nivel(g) + float(s.get('z', 0)); h = float(s.get('altura', 2.4))
-        top = mat('stand_%.2f_%.2f_%.2f' % tuple(s['color']), tuple(s['color']), .55) if s.get('color') else mat('stand_tapa', (.92, .55, .58), .55)
-        mb.prism(s['poligono'], z0, h, M['stand_lado'], top=top)
-        if s.get('codigo'):
-            c = centroid(s['poligono'])
-            ancho = min(abs(area(s['poligono'])) ** .5, 6)
-            texto(s['codigo'], c, z0 + h, max(.5, ancho * .28), M['rotulo'], g, math.radians(s.get('rot_rotulo', 0)), 'Txt_' + s['codigo'])
-    mb.build('Stands_' + g, g)
+        h = float(s.get('altura', 2.4))
+        z0 = z_nivel(g) + float(s.get('z', .13 if h < .3 else 0))     # los espacios planos se apoyan sobre la losa (12 cm)
+        top = material(s['color']) if s.get('color') else mat('espacio_tapa', (.92, .55, .58), .55)
+        mb.prism(s['poligono'], z0, h, M['espacio_lado'] if h > .3 else top, top=top)
+        if s.get('codigo') or s.get('rotulo'):
+            c = centroid(s['poligono']); txt = str(s.get('rotulo') or s['codigo'])
+            xs_, ys_ = [q[0] for q in s['poligono']], [q[1] for q in s['poligono']]
+            lado = max(max(xs_) - min(xs_), max(ys_) - min(ys_)) if not s.get('rot_rotulo') else min(max(xs_) - min(xs_), max(ys_) - min(ys_))
+            tam = max(.3, min(abs(area(s['poligono'])) ** .5 * .26, lado * .8 / (len(txt) * .62)))   # que el texto quepa en el espacio
+            rz_auto = s.get('rot_rotulo', 90 if (max(ys_) - min(ys_)) > (max(xs_) - min(xs_)) * 1.4 else 0)
+            texto(txt, c, z0 + h, tam, M['rotulo'], g,
+                  math.radians(rz_auto), 'Txt_' + str(s.get('codigo') or s['rotulo']))
+    mb.build('Espacios_' + g, g)
 
-# ---------------------------------------------------------------- objetos (tarimas, pantallas, sillas, carpas, arboles, cajas)
+# ---------------------------------------------------------------- objetos
 ICO = None
 
 
@@ -416,7 +464,7 @@ for i, o in enumerate(CFG.get('objetos', [])):
         mb.box((c[0], c[1], z0), (w, d, h), M['tarima'], rz, side=M['faldon'])
         if o.get('pantalla'):
             p = o['pantalla']; co, si = math.cos(rz), math.sin(rz)
-            back = (c[0] - (-si) * (d / 2 + .4), c[1] - co * (d / 2 + .4))      # al fondo de la tarima
+            back = (c[0] + si * (d / 2 + .4), c[1] - co * (d / 2 + .4))     # al fondo de la tarima
             mb.led(back, p['ancho'], p['alto'], z0 + h + float(p.get('base', .8)), rz)
     elif tipo == 'pantalla':
         mb.led(o['centro'], o['ancho'], o['alto'], z0 + float(o.get('base', 2)), rz)
@@ -428,9 +476,15 @@ for i, o in enumerate(CFG.get('objetos', [])):
             for iy in range(ny):
                 lx = -abs(bx - ax) / 2 + (ix + .5) * px; ly = -abs(by - ay) / 2 + (iy + .5) * py
                 mb.box((cx + lx * co - ly * si, cy + lx * si + ly * co, z0), (.45, .45, .85), M['silla'], rz)
-    elif tipo == 'sillas_puntos':                          # sillas extraidas del plano: [x, y, rotacion_grados]
+    elif tipo == 'sillas_puntos':                                   # sillas extraidas del plano: [x, y, rotacion_grados]
         for x, y, r in o['puntos']:
             mb.box((x, y, z0), (.45, .45, .85), M['silla'], math.radians(r))
+    elif tipo == 'mesas':                                           # mesas de trabajo o de comedor: [[x, y, rot], ...]
+        w, d = o.get('tam', (1.6, .8))
+        for x, y, *r in o['puntos']:
+            ang = math.radians(r[0] if r else 0)
+            mb.box((x, y, z0 + .72), (w, d, .04), material(o.get('material'), 'madera_clara'), ang)
+            mb.box((x, y, z0), (w * .9, d * .8, .72), M['silla'], ang)
     elif tipo == 'carpa':
         c = o['centro']; w, d, h = o['ancho'], o['fondo'], o.get('alto', 5)
         mb.box((c[0], c[1], z0 + h - .3), (w, d, .3), M['lona'], rz)
@@ -445,27 +499,40 @@ for i, o in enumerate(CFG.get('objetos', [])):
             s_ = random.uniform(.85, 1.25) * float(o.get('escala', 1))
             mb.raw(cv, cf, M['tronco'], (x, y, z0), (.18 * s_, .18 * s_, 2.6 * s_))
             mb.raw(v, f, M['copa'], (x, y, z0 + 3.6 * s_), (2.0 * s_, 2.0 * s_, 1.7 * s_), smooth=True)
+    elif tipo == 'escalera':                                        # de "desde" (abajo) a "hasta" (arriba), sube "sube" m
+        a, b = o['desde'], o['hasta']; sube = float(o['sube']); ancho = float(o.get('ancho', 1.4))
+        L = math.dist(a, b); n = max(2, round(sube / .175)); ang = math.atan2(b[1] - a[1], b[0] - a[0])
+        for k in range(n):
+            p = lerp(a, b, (k + .5) / n)
+            mb.box((p[0], p[1], z0), (L / n + .02, ancho, sube * (k + 1) / n), M['escalon'], ang)
+        for lado in (-1, 1):                                        # barandas
+            off = (-math.sin(ang) * lado * ancho / 2, math.cos(ang) * lado * ancho / 2)
+            pa = (a[0] + off[0], a[1] + off[1]); pb = (b[0] + off[0], b[1] + off[1])
+            for k in range(n):
+                p = lerp(pa, pb, (k + .5) / n)
+                mb.box((p[0], p[1], z0 + sube * (k + 1) / n + .85), (L / n + .02, .05, .05), M['baranda'], ang)
     elif tipo == 'caja':
         c = o['centro']; w, d, h = o['tam']
-        m = material(o.get('material') or o.get('color'), 'blanco')
-        mb.box((c[0], c[1], z0), (w, d, h), m, rz)
+        mb.box((c[0], c[1], z0), (w, d, h), material(o.get('material') or o.get('color'), 'blanco'), rz)
     else:
-        raise SystemExit(f'Objeto {i}: tipo desconocido "{tipo}" (tarima, pantalla, sillas, sillas_puntos, carpa, arbol, caja).')
+        raise SystemExit(f'Objeto {i}: tipo desconocido "{tipo}" (tarima, pantalla, sillas, sillas_puntos, mesas, carpa, arbol, escalera, caja).')
     if o.get('rotulo'):
-        c = o.get('centro') or centroid(o['area'] if 'area' in o else o['puntos'])
+        c = o.get('centro') or o.get('desde') or centroid(o['area'] if 'area' in o else [q[:2] for q in o['puntos']])
         texto(o['rotulo'], c, z0 + float(o.get('alto', .6)), 1.2, M['rotulo'], g, rz)
 for g, mb in por_grupo.items():
     mb.build('Objetos_' + g, g)
 
-# ---------------------------------------------------------------- luz y camara de estudio (solo para abrir el .blend y para renders)
+# ---------------------------------------------------------------- luz y camara de estudio (para abrir el .blend a mano)
 sol = bpy.data.objects.new('Sol', bpy.data.lights.new('Sol', 'SUN'))
-sol.data.energy = 3.5; sol.rotation_euler = (math.radians(50), 0, math.radians(35)); coll('entorno').objects.link(sol)
-cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+sol.data.energy = 3.5; sol.data.angle = math.radians(2.5)
+sol.rotation_euler = (math.radians(50), 0, math.radians(35)); coll('entorno').objects.link(sol)
+mx0, mx1, my0, my1 = min(xs), max(xs), min(ys), max(ys)
+cx, cy = (mx0 + mx1) / 2, (my0 + my1) / 2
 scene['CENTRO'] = (cx, cy)
-scene['RADIO'] = max(x1 - x0, y1 - y0) / 2
+scene['RADIO'] = max(mx1 - mx0, my1 - my0) / 2 + 10
 cam = bpy.data.objects.new('Cam_Iso', bpy.data.cameras.new('Cam_Iso'))
 cam.data.lens = 40; coll('entorno').objects.link(cam); scene.camera = cam
-d = scene['RADIO'] * 2.4
+d = scene['RADIO'] * 2.6
 cam.location = (cx + d * .55, cy - d * .75, d * .65)
 cam.rotation_euler = (math.radians(58), 0, math.radians(36))
 world = bpy.data.worlds.new('Cielo'); world.use_nodes = True
@@ -475,4 +542,5 @@ scene.world = world
 path = OUT / 'modelo.blend'
 bpy.ops.wm.save_as_mainfile(filepath=str(path))
 tris = sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in bpy.data.objects if o.type == 'MESH')
-print(f'MODELO OK {path} - {len(CFG.get("edificios", []))} edificios - {len(CFG.get("stands", []))} stands - {tris} triangulos')
+print(f'MODELO OK {path} - {len(CFG.get("edificios", []))} edificios - {len(CFG.get("espacios", []))} espacios - '
+      f'{len(CFG.get("muros", []))} muros - {tris} triangulos')

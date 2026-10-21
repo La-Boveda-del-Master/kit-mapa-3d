@@ -1,15 +1,16 @@
-"""Del plano en PDF (vectorial) a metros: inspecciona el PDF, calibra la escala y extrae stands, sillas y zonas.
+"""Del plano (PDF vectorial o DXF de CAD) a metros: inspecciona, calibra la escala y extrae espacios, muros, sillas y zonas.
 
 Uso:
-  python pipeline/extraer_plano.py inspeccionar proyectos/<recinto>/entrada/plano.pdf [--pagina 0] [--cuadricula 1]
-      Escribe proyectos/<recinto>/salida/inspeccion/: pagina.png (con regla en puntos PDF), colores.json
+  python pipeline/extraer_plano.py inspeccionar proyectos/<id>/entrada/plano.pdf [--pagina 0] [--cuadricula 1]
+  python pipeline/extraer_plano.py inspeccionar proyectos/<id>/entrada/plano.dxf          (CAD: capas, unidades, textos)
+      Escribe proyectos/<id>/salida/inspeccion/: pagina.png (con regla en puntos PDF), colores.json
       (rellenos usados, cuantos y de que tamano), textos.json (palabras con su posicion) y escala.json
       (escala medida por FFT sobre la cuadricula de fondo, si el PDF trae una imagen de cuadricula).
-  python pipeline/extraer_plano.py extraer proyectos/<recinto>/plano.json
-      Aplica las regiones y reglas de plano.json y escribe salida/plano_m.json (stands, objetos, zonas en metros)
+  python pipeline/extraer_plano.py extraer proyectos/<id>/plano.json
+      Aplica las regiones y reglas de plano.json y escribe salida/plano_m.json (espacios, muros, edificios, objetos, zonas)
       y salida/plano_m.png (vista previa en metros para revisarla contra el PDF). Imprime la validacion de medidas.
 
-Formato de plano.json: docs/FORMATO-RECINTO.md (seccion "plano.json").
+Formato de plano.json: docs/FORMATO-MAPA.md (seccion "plano.json"). Para planos en imagen: pipeline/calibrar_imagen.py.
 Mundo: +X Este, +Y Norte, metros. El PDF tiene y hacia abajo; aqui se invierte para que el norte quede arriba.
 """
 import json, math, re, sys, pathlib
@@ -132,7 +133,7 @@ def inspeccionar(pdf, pagina=0, cuadricula=1.0):
     (out / 'escala.json').write_text(json.dumps({'cuadricula_m': cuadricula, 'imagenes': medidas}, indent=1), encoding='utf8')
 
     print(f'Pagina {pagina}: {W:.0f} x {H:.0f} pt - {len(lista)} colores de relleno - {len(palabras)} palabras - {len(medidas)} imagenes')
-    print('Rellenos mas usados (posibles stands, sillas, zonas):')
+    print('Rellenos mas usados (posibles espacios, sillas, zonas):')
     for e in lista[:12]:
         print(f"  {e['relleno']}  x{e['cantidad']}  ~{e['ancho_pt_mediana']} x {e['alto_pt_mediana']} pt")
     for m in medidas:
@@ -169,11 +170,14 @@ def color_igual(a, b, tol):
 def extraer(cfg_path):
     cfg_path = pathlib.Path(cfg_path).resolve(); C = json.loads(cfg_path.read_text(encoding='utf8'))
     out = salida_de(cfg_path)
+    if C.get('dxf'):
+        import cad
+        return cad.extraer(C, cfg_path.parent, out, vista_previa)
     doc = pymupdf.open(cfg_path.parent / C['pdf']); page = doc[C.get('pagina', 0)]
     W, H = page.rect.width, page.rect.height
     regiones = [Region(r, W, H) for r in C['regiones']]       # la primera que contenga el punto gana: pon las pequenas primero
     words = page.get_text('words')
-    res = {'stands': [], 'objetos': [], 'zonas': [], 'sin_region': 0}
+    res = {'espacios': [], 'objetos': [], 'zonas': [], 'sin_region': 0}
     sillas = {}
 
     def region(x, y):
@@ -200,7 +204,7 @@ def extraer(cfg_path):
             poly = [list(reg.a_m(x, y)) for x, y in pts]
             nivel = regla.get('nivel', reg.nivel)
             t = regla['tipo']
-            if t == 'stand' and r.width * r.height >= regla.get('area_min_pt', 40):
+            if t in ('espacio', 'stand') and r.width * r.height >= regla.get('area_min_pt', 40):
                 txt = palabras_en(r)
                 patron = regla.get('codigo', r'^[A-Z]{1,3}[- ]?\d')
                 cod = next((w[4] for w in txt if re.match(patron, w[4]) and not re.match(r'^\d+[xX]\d+$', w[4])), '')
@@ -210,7 +214,7 @@ def extraer(cfg_path):
                     st['medida_rotulo'] = med
                 if regla.get('color'):
                     st['color'] = regla['color']
-                res['stands'].append(st)
+                res['espacios'].append(st)
             elif t == 'silla' and max(r.width, r.height) <= regla.get('lado_max_pt', 15):
                 c = (sum(p[0] for p in poly) / len(poly), sum(p[1] for p in poly) / len(poly))
                 e = (poly[1][0] - poly[0][0], poly[1][1] - poly[0][1])
@@ -226,17 +230,17 @@ def extraer(cfg_path):
     for nivel, pts in sillas.items():
         res['objetos'].append({'tipo': 'sillas_puntos', 'nivel': nivel, 'puntos': pts})
 
-    # stands repetidos (mismo codigo dibujado dos veces): queda el mas grande
+    # espacios repetidos (mismo codigo dibujado dos veces): queda el mas grande
     vistos = {}
-    for st in res['stands']:
+    for st in res['espacios']:
         a = abs(area(st['poligono']))
         if not st['codigo'] or st['codigo'] not in vistos or a > abs(area(vistos[st['codigo']]['poligono'])):
             vistos[st['codigo'] or id(st)] = st
-    res['stands'] = list(vistos.values())
+    res['espacios'] = list(vistos.values())
 
-    # validacion: stands rotulados "AxB" contra su medida dibujada
+    # validacion: espacios rotulados "AxB" contra su medida dibujada
     ok = tot = 0
-    for st in res['stands']:
+    for st in res['espacios']:
         m = re.match(r'^(\d+(?:[.,]\d+)?)[xX](\d+(?:[.,]\d+)?)$', st.get('medida_rotulo', ''))
         if not m:
             continue
@@ -244,14 +248,14 @@ def extraer(cfg_path):
         p = st['poligono']; xs = [q[0] for q in p]; ys = [q[1] for q in p]
         lados = sorted(lado_mayor_menor(p))
         tot += 1; ok += abs(lados[0] - a) / a < .12 and abs(lados[1] - b) / b < .12
-    res['validacion'] = {'stands_con_rotulo': tot, 'coinciden_12pct': ok}
-    sin_cod = sum(1 for s in res['stands'] if not s['codigo'])
+    res['validacion'] = {'espacios_con_rotulo': tot, 'coinciden_12pct': ok}
+    sin_cod = sum(1 for s in res['espacios'] if not s['codigo'])
     (out / 'plano_m.json').write_text(json.dumps(res, ensure_ascii=False), encoding='utf8')
     vista_previa(res, out / 'plano_m.png')
-    print(f"{len(res['stands'])} stands ({sin_cod} sin codigo) - {sum(len(o['puntos']) for o in res['objetos'] if o['tipo'] == 'sillas_puntos')} sillas - "
+    print(f"{len(res['espacios'])} espacios ({sin_cod} sin codigo) - {sum(len(o['puntos']) for o in res['objetos'] if o['tipo'] == 'sillas_puntos')} sillas - "
           f"{len(res['zonas'])} zonas - {res['sin_region']} dibujos fuera de toda region")
     if tot:
-        print(f'Validacion de escala: {ok} de {tot} stands rotulados coinciden con su medida dibujada (+/-12 %).'
+        print(f'Validacion de escala: {ok} de {tot} espacios rotulados coinciden con su medida dibujada (+/-12 %).'
               + ('' if ok / tot > .9 else '  REVISA la escala o la region: menos del 90 % coincide.'))
     print(f'Archivos: {out / "plano_m.json"} y {out / "plano_m.png"}')
 
@@ -267,7 +271,7 @@ def lado_mayor_menor(p):
 
 
 def vista_previa(res, ruta, px_m=6):
-    pts = [q for s in res['stands'] for q in s['poligono']] + [q for z in res['zonas'] for q in z['poligono']] + \
+    pts = [q for s in res['espacios'] for q in s['poligono']] + [q for z in res['zonas'] for q in z['poligono']] +           [q for e in res.get('edificios', []) for q in e['poligono']] + [q for m in res.get('muros', []) for q in m['puntos']] + \
           [q[:2] for o in res['objetos'] if o['tipo'] == 'sillas_puntos' for q in o['puntos']]
     if not pts:
         print('Nada extraido: revisa los colores de relleno de las reglas (mira salida/inspeccion/colores.json).'); return
@@ -286,11 +290,16 @@ def vista_previa(res, ruta, px_m=6):
         if o['tipo'] == 'sillas_puntos':
             for q in o['puntos']:
                 c = T(q); d.rectangle([c[0] - 1, c[1] - 1, c[0] + 1, c[1] + 1], fill=(90, 90, 110))
-    for s in res['stands']:
+    for e in res.get('edificios', []):
+        d.polygon([T(q) for q in e['poligono']], fill=(225, 232, 245), outline=(60, 80, 140))
+    for s in res['espacios']:
         d.polygon([T(q) for q in s['poligono']], fill=(246, 190, 192), outline=(160, 60, 70))
         if s['codigo']:
             c = T((sum(q[0] for q in s['poligono']) / len(s['poligono']), sum(q[1] for q in s['poligono']) / len(s['poligono'])))
             d.text(c, s['codigo'], fill=(40, 40, 40), font=f, anchor='mm')
+    for m in res.get('muros', []):
+        q = m['puntos'] + ([m['puntos'][0]] if m.get('cerrado') else [])
+        d.line([T(v) for v in q], fill=(30, 30, 30), width=max(2, int(px_m * m.get('grosor', .15))))
     d.text((8, 8), 'Cuadricula: 10 m - Norte arriba', fill=(120, 120, 120), font=f)
     im.save(ruta)
 
@@ -299,7 +308,10 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     if len(a) < 2:
         ayuda()
-    if a[0] == 'inspeccionar':
+    if a[0] == 'inspeccionar' and a[1].lower().endswith('.dxf'):
+        import cad
+        cad.inspeccionar(a[1], salida_de(a[1]) / 'inspeccion', fuente)
+    elif a[0] == 'inspeccionar':
         pag = int(a[a.index('--pagina') + 1]) if '--pagina' in a else 0
         cua = float(a[a.index('--cuadricula') + 1]) if '--cuadricula' in a else 1.0
         inspeccionar(a[1], pag, cua)

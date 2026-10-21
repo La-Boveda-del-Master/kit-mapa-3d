@@ -1,13 +1,13 @@
-"""Revisa recinto.json antes de abrir Blender: errores de forma que harian fallar o verse mal el modelo.
+"""Revisa mapa.json antes de abrir Blender: errores de forma que harian fallar o verse mal el modelo.
 
-Uso: python pipeline/validar_recinto.py proyectos/<recinto>/recinto.json
+Uso: python pipeline/validar_mapa.py proyectos/<id>/mapa.json
 Sale con codigo 1 si hay errores. Los avisos no detienen nada, pero conviene leerlos.
 """
 import json, re, sys, pathlib
 
 MATERIALES = {'concreto', 'concreto_pulido', 'piedra_pulida', 'alfombra', 'madera', 'madera_clara', 'pav_plaza', 'pav_arenisca',
-              'pav_oscuro', 'cesped', 'asfalto', 'agua', 'arenisca_muro', 'ladrillo', 'vidrio', 'blanco', 'negro', 'panel'}
-OBJETOS = {'tarima', 'pantalla', 'sillas', 'sillas_puntos', 'carpa', 'arbol', 'caja'}
+              'pav_oscuro', 'cesped', 'asfalto', 'agua', 'arenisca_muro', 'ladrillo', 'vidrio', 'blanco', 'negro', 'panel', 'muro_interior'}
+OBJETOS = {'tarima', 'pantalla', 'sillas', 'sillas_puntos', 'mesas', 'carpa', 'arbol', 'escalera', 'caja'}
 err, avi = [], []
 
 
@@ -36,9 +36,6 @@ ruta = pathlib.Path(sys.argv[1]); C = json.loads(ruta.read_text(encoding='utf8')
 niv = {n['id']: n for n in C.get('niveles', [])}
 if 'base' not in niv and not niv:
     err.append('Faltan "niveles".')
-for n in C.get('niveles', []):
-    if n.get('separacion', 0) and n.get('bajo_techo'):
-        avi.append(f'Nivel {n["id"]}: tiene separacion y bajo_techo a la vez; normalmente el que flota es el de arriba y el bajo_techo es el de abajo.')
 ids = set()
 for e in C.get('edificios', []):
     k = f'Edificio {e.get("id")}'
@@ -48,22 +45,26 @@ for e in C.get('edificios', []):
     poly(k, e.get('poligono'))
     if e.get('nivel', 'base') not in niv:
         err.append(f'{k}: nivel "{e.get("nivel")}" no esta en "niveles".')
-    if not 2 <= float(e.get('altura', 0)) <= 60:
-        avi.append(f'{k}: altura {e.get("altura")} m fuera de lo comun (2 a 60).')
+    if not 2 <= float(e.get('altura', 0)) <= 300:
+        avi.append(f'{k}: altura {e.get("altura")} m fuera de lo comun (2 a 300).')
     mat(k, e.get('piso')); mat(k, e.get('fachada'))
     for p in e.get('puertas', []):
         if p['lado'] >= len(e.get('poligono', [])):
             err.append(f'{k}: puerta en el lado {p["lado"]}, pero el poligono solo tiene {len(e["poligono"])} lados (se cuentan desde 0).')
 for z in C.get('zonas', []):
     poly(f'Zona {z.get("id")}', z.get('poligono')); mat(f'Zona {z.get("id")}', z.get('material'))
+for w in C.get('muros', []):
+    if len(w.get('puntos', [])) < 2:
+        err.append('Muro con menos de 2 puntos.')
+    mat('Muro', w.get('material'))
 cods = {}
-for s in C.get('stands', []):
-    poly(f'Stand {s.get("codigo")}', s.get('poligono'))
+for s in C.get('espacios', []) + C.get('stands', []):
+    poly(f'Espacio {s.get("codigo")}', s.get('poligono'))
     if s.get('codigo'):
         cods[s['codigo']] = cods.get(s['codigo'], 0) + 1
 rep = [c for c, n in cods.items() if n > 1]
 if rep:
-    avi.append(f'Codigos de stand repetidos: {", ".join(rep[:10])}{"..." if len(rep) > 10 else ""}')
+    avi.append(f'Codigos de espacio repetidos: {", ".join(rep[:10])}{"..." if len(rep) > 10 else ""}')
 for i, o in enumerate(C.get('objetos', [])):
     if o.get('tipo') not in OBJETOS:
         err.append(f'Objeto {i}: tipo "{o.get("tipo")}" no existe ({", ".join(sorted(OBJETOS))}).')
@@ -73,9 +74,13 @@ if len(nums) != len(set(nums)):
 for p in C.get('pines', []):
     if p.get('nivel', 'base') not in niv:
         err.append(f'Pin {p.get("n")}: nivel "{p.get("nivel")}" no esta en "niveles".')
-for rel in ([C['stands_desde']] if isinstance(C.get('stands_desde'), str) else C.get('stands_desde', [])):
+for rel in ([C['importar']] if isinstance(C.get('importar'), str) else C.get('importar', [])):
     if not (ruta.parent / rel).exists():
-        err.append(f'stands_desde: no existe {rel}. Corre antes pipeline/extraer_plano.py extraer.')
+        err.append(f'importar: no existe {rel}. Corre antes pipeline/extraer_plano.py extraer.')
+if C.get('calco') and not (ruta.parent / C['calco'].get('imagen', '')).exists():
+    err.append('calco: no existe la imagen.')
+if C.get('marca', {}).get('logo') and not (ruta.parent / C['marca']['logo']).exists():
+    err.append('marca.logo: no existe el archivo del logo.')
 if not C.get('pines'):
     avi.append('No hay pines: el visor quedara sin lista de lugares.')
 
@@ -83,6 +88,6 @@ for a in avi:
     print('AVISO ', a)
 for e in err:
     print('ERROR ', e)
-print(f'{len(C.get("edificios", []))} edificios, {len(C.get("stands", []))} stands a mano, {len(C.get("pines", []))} pines, '
+print(f'{len(C.get("edificios", []))} edificios, {len(C.get("espacios", []))} espacios a mano, {len(C.get("muros", []))} muros, {len(C.get("pines", []))} pines, '
       f'{len(niv)} niveles -> {len(err)} errores, {len(avi)} avisos')
 sys.exit(1 if err else 0)

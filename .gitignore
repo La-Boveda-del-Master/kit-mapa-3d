@@ -5,7 +5,9 @@ salida/
 *.blend1
 *.blend@
 __pycache__/
+# Planos de juguete de los ejemplos: los generan sus scripts
+ejemplos/campus-demo/entrada/plano.pdf
+ejemplos/oficina-demo/entrada/plano.dxf
 # Proyectos de cada persona: su material es suyo
 proyectos/*/
 !proyectos/LEEME.md
-ejemplos/demo-centro-eventos/entrada/plano.pdf

@@ -1,0 +1,39 @@
+{
+  "id": "oficina-demo",
+  "nombre": "Oficina Demo",
+  "marca": {
+    "titulo": "OFICINA DEMO",
+    "subtitulo": "Edificio de 3 pisos · importado de un plano CAD (DXF)",
+    "nota": "Oficina inventada para probar el kit. Plano en milímetros, 3 pisos dibujados lado a lado.",
+    "etiqueta_lugares": "Lugares",
+    "etiqueta_espacios": "Salas",
+    "color": "#0f766e"
+  },
+  "importar": "salida/plano_m.json",
+  "terreno": { "margen": 22, "material": "concreto", "vias": [[[-22, -14], [52, -14], 9]] },
+  "niveles": [
+    { "id": "p1", "nombre": "Piso 1", "z": 0, "bajo_techo": true },
+    { "id": "p2", "nombre": "Piso 2", "z": 3.6, "separacion": 11, "bajo_techo": true },
+    { "id": "p3", "nombre": "Piso 3", "z": 7.2, "separacion": 22 }
+  ],
+  "zonas": [
+    { "id": "anden", "nivel": "p1", "material": "pav_plaza", "poligono": [[-6, -8], [36, -8], [36, 0], [-6, 0]] },
+    { "id": "jardin", "nivel": "p1", "material": "cesped", "poligono": [[32, 0], [44, 0], [44, 20], [32, 20]] },
+    { "id": "parqueadero", "nivel": "p1", "material": "asfalto", "poligono": [[-18, 0], [-4, 0], [-4, 26], [-18, 26]], "rotulo": "P", "tam_rotulo": 5 }
+  ],
+  "objetos": [
+    { "tipo": "escalera", "nivel": "p1", "desde": [24.5, 10], "hasta": [29.5, 10], "sube": 3.6, "ancho": 1.6 },
+    { "tipo": "escalera", "nivel": "p2", "desde": [24.5, 10], "hasta": [29.5, 10], "sube": 3.6, "ancho": 1.6 },
+    { "tipo": "mesas", "nivel": "p1", "tam": [1.2, 0.8], "puntos": [[21, 3], [24, 3], [27, 3], [21, 6], [24, 6], [27, 6]] },
+    { "tipo": "sillas", "nivel": "p3", "area": [[2, 2], [16, 15]], "paso": [0.6, 1.0] },
+    { "tipo": "tarima", "nivel": "p3", "centro": [9, 17.6], "ancho": 8, "fondo": 2.6, "alto": 0.4, "rot": 180, "pantalla": { "ancho": 5, "alto": 1.8, "base": 0.5 } },
+    { "tipo": "arbol", "nivel": "p1", "puntos": [[34, 3], [38, 8], [41, 14], [35, 17], [-2, -5], [10, -5], [22, -5], [34, -5]], "escala": 0.8 }
+  ],
+  "pines": [
+    { "n": 1, "nombre": "Recepción", "detalle": "Piso 1 · ingreso principal", "nivel": "p1", "pos": [5, 4, 2.5], "color": [0.06, 0.46, 0.43] },
+    { "n": 2, "nombre": "Sala de juntas", "detalle": "Piso 1 · 10 personas", "nivel": "p1", "pos": [4, 16, 2.5], "color": [0.06, 0.46, 0.43] },
+    { "n": 3, "nombre": "Oficina abierta", "detalle": "Piso 2 · 8 puestos", "nivel": "p2", "pos": [6, 4, 2.5], "color": [0.15, 0.39, 0.92] },
+    { "n": 4, "nombre": "Auditorio", "detalle": "Piso 3 · 280 sillas", "nivel": "p3", "pos": [9, 9, 2.5], "color": [0.85, 0.47, 0.02] },
+    { "n": 5, "nombre": "Terraza", "detalle": "Piso 3 · vista al jardín", "nivel": "p3", "pos": [24, 5, 2.5], "color": [0.85, 0.47, 0.02] }
+  ]
+}

@@ -1,7 +1,14 @@
-# Caso real: Plaza Mayor Medellín · Feria Effix 2026
+# Caso de origen: un centro de convenciones (Plaza Mayor Medellín)
 
-Cómo se hizo el primer mapa, del 1 al 7 de octubre de 2026. Lo hicieron Claude Code y Alexander Cast. Es el
-origen de este kit. Los archivos originales están en `ejemplos/plaza-mayor/`.
+El kit nació de un trabajo real: el mapa 3D de Plaza Mayor Medellín para una feria de octubre de 2026. Lo hicieron
+Claude Code y Alexander Cast entre el 1 y el 7 de octubre. Es el caso más complejo resuelto hasta ahora:
+- 6 regiones del plano a escalas distintas;
+- pisos apilados y sótanos;
+- 238 espacios cruzados con una base de datos;
+- GPS y video.
+
+El código original está en `ejemplos/caso-origen-plaza-mayor/`. Lo que sirve para cualquier proyecto ya está
+generalizado en `pipeline/` y en los skills.
 
 ## El recinto
 

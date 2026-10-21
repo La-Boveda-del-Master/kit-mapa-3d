@@ -1,22 +1,29 @@
-# Kit Mapa 3D de Recintos
+# Kit Mapa 3D
 
-Convierte el **plano en PDF de un recinto** en un **mapa 3D navegable en la web**. Sirve para centros de
-convenciones, ferias, coliseos, campus o centros comerciales. El mapa trae:
+**Convierte cualquier plano en 3D con calidad profesional.** Sirve para un PDF, un CAD (DWG/DXF) o una simple imagen
+de una oficina, una casa, un edificio, un campus, un centro comercial, un hotel o un recinto de eventos. Entrega:
 
-- pabellones y salones a escala real;
-- un modo **"Por niveles"**: los pisos de arriba flotan para dejar ver los de abajo;
-- **pines numerados** de lugares, con lista y ficha;
-- **stands buscables** por código o nombre;
-- uso cómodo en el **celular** (hoja inferior, táctil, liviano);
-- **renders** para presentar o imprimir y **video de recorrido**.
+- **Renders y láminas** en 4 estilos (realista, maqueta blanca, ilustrado, noche), hasta 8K o A1 a 300 ppp, con
+  título, lugares numerados, leyenda, norte y escala.
+- **Mapa web 3D navegable**, con tu marca. Se usa en el celular y en el computador, con:
+  - modo **Por niveles**, en el que los pisos de arriba flotan para dejar ver los de abajo;
+  - buscador de salas, locales u oficinas;
+  - brújula;
+  - links directos para poner en códigos QR.
+- **Video de recorrido** en MP4.
 
-Lo arma **Claude Code** guiado por los skills de este repo: te entrevista, te pide el plano, construye, te muestra
-avances y publica cuando le digas.
+Lo opera **Claude Code** guiado por los skills de este repo: te entrevista, te pide el plano, construye, te muestra
+avances, pasa un control de calidad y entrega.
 
-![Plaza Mayor Medellín · vista exterior](ejemplos/plaza-mayor/renders/maqueta_iso.jpg)
-![Plaza Mayor Medellín · por niveles](ejemplos/plaza-mayor/renders/mapa_niveles_caja.jpg)
+![Oficina de 3 pisos importada de CAD, vista por niveles](docs/img/oficina-niveles.jpg)
 
-*Primer mapa hecho con este método: Plaza Mayor Medellín para Feria Effix 2026.*
+| Realista | Maqueta blanca |
+|---|---|
+| ![](docs/img/estilo-realista.jpg) | ![](docs/img/estilo-maqueta.jpg) |
+| **Ilustrado** | **Noche** |
+| ![](docs/img/estilo-ilustrado.jpg) | ![](docs/img/estilo-noche.jpg) |
+
+![Lámina lista para imprimir](docs/img/lamina.jpg)
 
 ## Empezar
 
@@ -27,41 +34,38 @@ Requisitos: [Claude Code](https://claude.com/claude-code), Python 3.10+ y [Blend
 ## Cómo funciona
 
 ```
-plano.pdf ──extraer_plano.py──▶ plano_m.json (stands, sillas y zonas en metros)
-                                      │
-recinto.json (edificios, niveles, pines) ┘──construir_modelo.py (Blender)──▶ modelo.blend
-                                                                                │
-                                   ┌──────────exportar_web.py──────────────────┤
-                                   ▼                                            ▼
-              salida/web/  (index.html + mapa.glb con Draco + datos.json)   renders.py ─▶ PNG / MP4
-                                   │
-                    Vercel · Netlify · GitHub Pages · iframe · app React/Next
+ plano.pdf ─┐                                   ┌─▶ renders.py ──▶ PNG 4K/8K/A1 ──▶ componer_lamina.py ──▶ lámina PNG + PDF
+ plano.dxf ─┼─▶ extraer_plano.py ─▶ plano_m.json │
+ imagen   ──┘   calibrar_imagen.py               ├─▶ exportar_web.py ──▶ web/ (three.js + GLB Draco) ──▶ Vercel · Netlify · iframe · app
+                         │                       │
+ mapa.json (marca, pisos, edificios, lugares) ─▶ construir_modelo.py (Blender) ─▶ modelo.blend ─▶ renders.py --video ──▶ MP4
 ```
 
 | Carpeta | Qué hay |
 |---|---|
-| `.claude/skills/` | 6 skills: `mapa-3d-recinto` (orquestador), `mapa-plano-a-metros`, `mapa-modelo-blender`, `mapa-visor-web`, `mapa-integrar-app`, `mapa-renders-video` |
+| `.claude/skills/` | 8 skills: `mapa-3d` (orquestador), `mapa-plano-a-metros`, `mapa-modelo-blender`, `mapa-render-profesional`, `mapa-visor-web`, `mapa-video-recorrido`, `mapa-integrar-app`, `mapa-control-calidad` |
 | `CLAUDE.md` / `AGENTS.md` | Instrucciones para el agente (Claude Code, Codex u otro) |
-| `pipeline/` | Scripts: texturas, extracción del PDF, validación, construcción en Blender, exportación web, renders y video |
-| `visor/` | Visor web three.js (plantilla que el exportador copia a cada proyecto) |
-| `docs/` | Entrevista, formato de `recinto.json`, problemas conocidos y el caso real de Plaza Mayor |
-| `ejemplos/demo-centro-eventos/` | Recinto inventado, completo y probado de punta a punta, con plano PDF de juguete |
-| `ejemplos/plaza-mayor/` | Fuente original del mapa de Plaza Mayor, integración en la app Next.js y renders |
-| `proyectos/` | Aquí va cada recinto nuevo (`python pipeline/nuevo_proyecto.py <id>`) |
+| `pipeline/` | Scripts: texturas, lectura de PDF/DXF/imagen, validación, construcción en Blender, renders y video, láminas, exportación web |
+| `visor/` | Plantilla del mapa web (three.js) |
+| `docs/` | Entrevista, formatos de entrada, formato de `mapa.json`, problemas conocidos, caso de origen |
+| `ejemplos/campus-demo/` | Exteriores con varios edificios, a partir de un plano PDF |
+| `ejemplos/oficina-demo/` | Edificio de 3 pisos con salas, a partir de un plano CAD (DXF) |
+| `ejemplos/caso-origen-plaza-mayor/` | Código original del primer mapa real (un centro de convenciones), como referencia |
+| `proyectos/` | Aquí va cada lugar nuevo (`python pipeline/nuevo_proyecto.py <id>`) |
 
 ## A mano, sin agente
 
 ```bash
 pip install -r requirements.txt
 python pipeline/generar_texturas.py
-python ejemplos/demo-centro-eventos/entrada/generar_plano_demo.py
-python pipeline/extraer_plano.py extraer ejemplos/demo-centro-eventos/plano.json
-blender -b --factory-startup --python pipeline/construir_modelo.py -- ejemplos/demo-centro-eventos/recinto.json
-blender -b ejemplos/demo-centro-eventos/salida/modelo.blend --python pipeline/exportar_web.py -- ejemplos/demo-centro-eventos/recinto.json
-python -m http.server 8765 --directory ejemplos/demo-centro-eventos/salida/web
+python ejemplos/oficina-demo/entrada/generar_dxf_demo.py
+python pipeline/extraer_plano.py extraer ejemplos/oficina-demo/plano.json
+blender -b --factory-startup --python pipeline/construir_modelo.py -- ejemplos/oficina-demo/mapa.json
+blender -b ejemplos/oficina-demo/salida/modelo.blend --python pipeline/renders.py -- ejemplos/oficina-demo/mapa.json --estilo=ilustrado --vistas=niveles --tam=hd
+python pipeline/componer_lamina.py ejemplos/oficina-demo/salida/renders/niveles_ilustrado.png
+blender -b ejemplos/oficina-demo/salida/modelo.blend --python pipeline/exportar_web.py -- ejemplos/oficina-demo/mapa.json
+python -m http.server 8766 --directory ejemplos/oficina-demo/salida/web
 ```
-
-Abre http://localhost:8765.
 
 ---
 

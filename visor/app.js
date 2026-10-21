@@ -1,4 +1,4 @@
-// Mapa 3D navegable de un recinto. Modelo: mapa.glb (pipeline/exportar_web.py). Titulos, niveles, pines y stands: datos.json.
+// Kit Mapa 3D - visor web. Modelo: mapa.glb (pipeline/exportar_web.py). Marca, niveles, lugares y espacios: datos.json.
 // Coordenadas: Blender (x este, y norte, z alto) -> three.js (x, z, -y).
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -43,7 +43,7 @@ Object.assign(controles, { enableDamping: true, dampingFactor: 0.08, maxPolarAng
   zoomToCursor: true, autoRotateSpeed: 0.7, screenSpacePanning: false });
 
 // ---------------------------------------------------------------- estado
-let datos = null, modo = 'exterior', capa = 'lugares', sucio = true, sel = null, selStand = null, libre = 1.5, R = 200;
+let datos = null, modo = 'exterior', capa = 'lugares', sucio = true, sel = null, selEspacio = null, libre = 1.5, R = 200;
 const CENTRO = new THREE.Vector3();
 const raices = {}, porGrupo = {}, pines = [], puntos = [];
 const lift = {};
@@ -83,7 +83,7 @@ function aplicarVisibilidad() {
   }
   // en exterior no se muestran los pines de niveles tapados por otro (se pasa solo a "Por niveles" al tocarlos)
   for (const p of pines) p.activo = capa === 'lugares' && (modo === 'niveles' || !nivelBajoTecho(p.grupo));
-  for (const p of puntos) p.activo = capa === 'stands' && (modo === 'niveles' || !nivelBajoTecho(p.grupo));
+  for (const p of puntos) p.activo = capa === 'espacios' && (modo === 'niveles' || !nivelBajoTecho(p.grupo));
   sucio = true;
 }
 
@@ -102,7 +102,7 @@ function ponerModo(nuevo) {
   }, () => { aplicarVisibilidad(); renderer.shadowMap.needsUpdate = true; });
 }
 
-// ---------------------------------------------------------------- pines (lugares) y puntos (stands)
+// ---------------------------------------------------------------- pines (lugares) y puntos (espacios)
 const NS = 'http://www.w3.org/2000/svg';
 function crearPin(p) {
   const col = sRGB(p.color);
@@ -123,14 +123,14 @@ function crearPin(p) {
 function crearPunto(s) {
   const b = document.createElement('button');
   b.className = 'punto oculto'; b.title = `${s.codigo}${s.nombre ? ' · ' + s.nombre : ''}`; b.setAttribute('aria-label', b.title);
-  b.addEventListener('click', (ev) => { ev.stopPropagation(); seleccionarStand(s.key); });
+  b.addEventListener('click', (ev) => { ev.stopPropagation(); seleccionarEspacio(s.key); });
   $('pines').append(b);
   const li = document.createElement('li');
   li.innerHTML = '<span class="cod"></span><b></b><small></small>';
-  li.querySelector('.cod').textContent = s.codigo; li.querySelector('b').textContent = s.nombre || `Stand ${s.codigo}`;
+  li.querySelector('.cod').textContent = s.codigo; li.querySelector('b').textContent = s.nombre || s.codigo;
   li.querySelector('small').textContent = [s.detalle, s.nivel].filter(Boolean).join(' · ');
-  li.addEventListener('click', () => seleccionarStand(s.key));
-  $('lista-stands').append(li);
+  li.addEventListener('click', () => seleccionarEspacio(s.key));
+  $('lista-espacios').append(li);
   return { ...s, el: b, li, activo: false, base: aThree(s.pos), mundo: new THREE.Vector3() };
 }
 
@@ -157,7 +157,7 @@ function acercar(base, grupo, cerca) {
 
 function mostrarFicha(html) {
   const f = $('ficha'); f.hidden = false; f.innerHTML = html;
-  $('asa-txt').textContent = capa === 'stands' ? 'Ver todos los stands' : 'Ver todos los lugares';
+  $('asa-txt').textContent = 'Ver todos: ' + (capa === 'espacios' ? datos.meta.espacios : datos.meta.lugares).toLowerCase();
   if (movil.matches) abrirPanel(false);
   medirHoja();
 }
@@ -173,29 +173,29 @@ function seleccionar(n) {
   acercar(p.base, p.grupo, movil.matches ? R * .9 : R * .75);
 }
 
-function seleccionarStand(key) {
+function seleccionarEspacio(key) {
   const s = puntos.find((q) => q.key === key);
   if (!s) return;
-  if (capa !== 'stands') ponerCapa('stands');
-  selStand = key;
+  if (capa !== 'espacios') ponerCapa('espacios');
+  selEspacio = key;
   for (const q of puntos) { q.el.classList.toggle('sel', q.key === key); q.li.classList.toggle('sel', q.key === key); }
   s.li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  mostrarFicha(`<span class="cod">${esc(s.codigo)}</span><b>${esc(s.nombre || 'Stand ' + s.codigo)}</b><small>${esc([s.detalle, s.nivel].filter(Boolean).join(' · '))}</small>`);
+  mostrarFicha(`<span class="cod">${esc(s.codigo)}</span><b>${esc(s.nombre || s.codigo)}</b><small>${esc([s.detalle, s.nivel].filter(Boolean).join(' · '))}</small>`);
   acercar(s.base, s.grupo, 45);
 }
 
 function ponerCapa(nueva) {
   capa = nueva;
-  for (const [id, c] of [['capa-lugares', 'lugares'], ['capa-stands', 'stands']]) {
+  for (const [id, c] of [['capa-lugares', 'lugares'], ['capa-espacios', 'espacios']]) {
     $(id).classList.toggle('activo', capa === c); $(id).setAttribute('aria-selected', capa === c);
   }
-  $('lista').hidden = capa !== 'lugares'; $('lista-stands').hidden = capa !== 'stands'; $('buscar').hidden = capa !== 'stands';
+  $('lista').hidden = capa !== 'lugares'; $('lista-espacios').hidden = capa !== 'espacios'; $('buscar').hidden = capa !== 'espacios';
   $('ficha').hidden = true;
   aplicarVisibilidad();
 }
 
-function filtrarStands(q) {
-  const t = q.trim().toUpperCase().replace(/[^A-Z0-9 ]/g, ''), k = t.replace(/ /g, '').replace(/^([A-Z]+)0*(\d)/, '$1$2');
+function filtrarEspacios(q) {
+  const t = q.trim().toUpperCase().replace(/[^A-Z0-9 ]/g, ''), k = t.replace(/ /g, '').replace(/^([A-Z]*)0*(\d)/, '$1$2');
   for (const s of puntos) {
     const ok = !t || s.key.startsWith(k) || (s.nombre || '').toUpperCase().includes(t);
     s.li.hidden = !ok;
@@ -208,7 +208,7 @@ const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 function abrirPanel(abrir) {
   $('panel').classList.toggle('abierto', abrir);
   $('panel-asa').setAttribute('aria-expanded', abrir);
-  $('asa-txt').textContent = abrir || !(sel || selStand) ? datos.meta.lista : (capa === 'stands' ? 'Ver todos los stands' : 'Ver todos los lugares');
+  $('asa-txt').textContent = abrir || !(sel || selEspacio) ? datos.meta.lugares : 'Ver todos: ' + (capa === 'espacios' ? datos.meta.espacios : datos.meta.lugares).toLowerCase();
   medirHoja();
 }
 function medirHoja() {
@@ -223,8 +223,8 @@ $('panel-asa').addEventListener('click', () => { if (movil.matches) abrirPanel(!
 $('modo-exterior').addEventListener('click', () => ponerModo('exterior'));
 $('modo-niveles').addEventListener('click', () => ponerModo('niveles'));
 $('capa-lugares').addEventListener('click', () => ponerCapa('lugares'));
-$('capa-stands').addEventListener('click', () => ponerCapa('stands'));
-$('buscar').addEventListener('input', (e) => filtrarStands(e.target.value));
+$('capa-espacios').addEventListener('click', () => ponerCapa('espacios'));
+$('buscar').addEventListener('input', (e) => filtrarEspacios(e.target.value));
 $('btn-inicio').addEventListener('click', () => { const i = vistaInicial(); volar(i.pos, i.obj); });
 $('btn-planta').addEventListener('click', () => {
   const o = controles.target.clone().setY(0);
@@ -233,6 +233,11 @@ $('btn-planta').addEventListener('click', () => {
 $('btn-girar').addEventListener('click', (e) => {
   controles.autoRotate = !controles.autoRotate;
   e.currentTarget.setAttribute('aria-pressed', controles.autoRotate);
+});
+$('btn-norte').addEventListener('click', () => {     // brujula: vuelve a norte arriba manteniendo distancia y altura
+  const o = controles.target.clone(), off = camara.position.clone().sub(o);
+  const h = Math.hypot(off.x, off.z);
+  volar(o.clone().add(new THREE.Vector3(0, off.y, h)), o, 800);
 });
 controles.addEventListener('start', () => { $('ayuda').classList.add('fuera'); });
 controles.addEventListener('change', () => { sucio = true; });
@@ -263,6 +268,7 @@ function bucle(ahora) {
   if (!sucio) return;
   sucio = false;
   renderer.render(scene, camara);
+  $('brujula-aguja').style.transform = `rotate(${controles.getAzimuthalAngle()}rad)`;
   ubicar(pines); ubicar(puntos);                     // en el mismo cuadro que el render: los pines no se rezagan al girar
 }
 
@@ -270,7 +276,7 @@ function bucle(ahora) {
 async function iniciar() {
   ajustar();
   datos = await (await fetch('datos.json?v=' + VER)).json();
-  R = Math.max(60, datos.radio);
+  R = Math.max(25, datos.radio);
   CENTRO.copy(aThree([datos.centro[0], datos.centro[1], 0]));
   Object.assign(controles, { minDistance: 12, maxDistance: R * 9 });
   scene.fog = new THREE.Fog(HORIZONTE, R * 5, R * 18);
@@ -283,7 +289,11 @@ async function iniciar() {
   const lejos = new THREE.Mesh(new THREE.PlaneGeometry(R * 40, R * 40), new THREE.MeshLambertMaterial({ color: 0xa9aaa6 }));
   lejos.rotation.x = -Math.PI / 2; lejos.position.set(CENTRO.x, datos.z_min - .6, CENTRO.z); scene.add(lejos);
   const i = vistaInicial(); camara.position.copy(i.pos); controles.target.copy(i.obj); controles.update();
-  $('nota').textContent = datos.meta.nota; $('asa-txt').textContent = datos.meta.lista;
+  $('nota').textContent = datos.meta.nota; $('asa-txt').textContent = datos.meta.lugares;
+  $('capa-lugares').textContent = datos.meta.lugares; $('capa-espacios').textContent = datos.meta.espacios;
+  $('buscar').placeholder = `Buscar en ${datos.meta.espacios.toLowerCase()} por código o nombre`;
+  document.documentElement.style.setProperty('--acento', datos.meta.color);
+  if (datos.meta.logo) for (const el of document.querySelectorAll('.logo')) { el.src = datos.meta.logo + '?v=' + VER; el.hidden = false; }
   for (const k of Object.keys(datos.lift)) lift[k] = 0;
   if (!Object.keys(datos.lift).length) $('modo-niveles').closest('.modos').hidden = true;   // un solo nivel: no hay modos
 
@@ -303,14 +313,15 @@ async function iniciar() {
   });
   for (const [k, nombre] of Object.entries(datos.raices)) raices[k] = gltf.scene.getObjectByName(nombre);
   scene.add(gltf.scene);
-  for (const p of datos.pines) pines.push(crearPin(p));
-  for (const s of datos.stands) puntos.push(crearPunto(s));
+  for (const p of datos.lugares) pines.push(crearPin(p));
+  for (const s of datos.espacios) puntos.push(crearPunto(s));
   if (puntos.length) $('capas').hidden = false;
   aplicarVisibilidad();
   renderer.shadowMap.needsUpdate = true;
-  window.__mapa = { scene, camara, controles, pines, puntos, ponerModo, ponerCapa, seleccionar, seleccionarStand, renderer };
-  const q = new URLSearchParams(location.search);          // enlaces directos: ?lugar=3  o  ?stand=A12
-  if (q.get('stand')) seleccionarStand(q.get('stand').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^([A-Z]+)0*(\d)/, '$1$2'));
+  window.__mapa = { scene, camara, controles, pines, puntos, ponerModo, ponerCapa, seleccionar, seleccionarEspacio, renderer };
+  const q = new URLSearchParams(location.search);          // enlaces directos: ?lugar=3  o  ?espacio=A12
+  const qe = q.get('espacio') || q.get('stand');
+  if (qe) seleccionarEspacio(qe.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^([A-Z]*)0*(\d)/, '$1$2'));
   else if (q.get('lugar')) seleccionar(Number(q.get('lugar')));
   $('carga').classList.add('lista-ok');
   setTimeout(() => $('ayuda').classList.add('fuera'), 9000);
