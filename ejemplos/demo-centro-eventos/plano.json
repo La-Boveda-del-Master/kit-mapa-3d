@@ -1,0 +1,11 @@
+{
+  "pdf": "entrada/plano.pdf",
+  "pagina": 0,
+  "regiones": [
+    { "id": "pabellon_a", "nivel": "base", "escala_pt_m": [10, 10], "origen_pt": [100, 900], "origen_m": [0, 0], "rotacion": 0 }
+  ],
+  "reglas": [
+    { "tipo": "stand", "relleno": [0.95, 0.62, 0.64], "tolerancia": 0.03, "area_min_pt": 40, "codigo": "^[A-Z]{1,3}[- ]?[0-9]", "color": [0.30, 0.58, 0.95] },
+    { "tipo": "silla", "relleno": [0.69, 0.68, 0.68], "tolerancia": 0.02, "lado_max_pt": 15 }
+  ]
+}

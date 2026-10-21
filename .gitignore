@@ -1,0 +1,11 @@
+# Generado por los scripts (se reproduce con el pipeline)
+texturas/
+salida/
+**/salida/
+*.blend1
+*.blend@
+__pycache__/
+# Proyectos de cada persona: su material es suyo
+proyectos/*/
+!proyectos/LEEME.md
+ejemplos/demo-centro-eventos/entrada/plano.pdf

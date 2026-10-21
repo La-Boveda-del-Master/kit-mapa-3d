@@ -1,0 +1,115 @@
+:root {
+  --tinta: #101114;
+  --panel: rgba(255, 255, 255, .94);
+  --borde: rgba(16, 17, 20, .10);
+  --gris: #62646b;
+  --rojo: #e11d2a;
+  --radio: 14px;
+  --sombra: 0 6px 24px rgba(10, 12, 20, .18);
+  --ancho-panel: 340px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #cfdcea; color: var(--tinta);
+  font: 15px/1.35 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+#lienzo { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+
+/* marca */
+.marca { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 14px; padding: 10px 16px 11px; border-radius: var(--radio);
+  background: var(--tinta); color: #fff; box-shadow: var(--sombra); border-left: 5px solid var(--rojo); }
+.marca strong { display: block; font-size: 17px; letter-spacing: .04em; }
+.marca span { display: block; font-size: 12px; opacity: .72; }
+
+/* selector de modo */
+.modos { position: fixed; top: max(14px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; padding: 4px;
+  border-radius: 999px; background: var(--panel); box-shadow: var(--sombra); backdrop-filter: blur(8px); }
+.modos button { padding: 8px 18px; border-radius: 999px; font-weight: 600; color: var(--gris); transition: background .2s, color .2s; white-space: nowrap; }
+.modos button.activo { background: var(--tinta); color: #fff; }
+
+/* controles */
+.controles { position: fixed; left: 14px; bottom: max(18px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+.controles button { width: 44px; height: 44px; border-radius: 12px; background: var(--panel); box-shadow: var(--sombra); display: grid; place-items: center;
+  backdrop-filter: blur(8px); transition: background .2s, color .2s; }
+.controles button:hover { background: #fff; }
+.controles button[aria-pressed="true"] { background: var(--rojo); color: #fff; }
+
+/* pines */
+#pines { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.pin { position: absolute; left: 0; top: 0; width: 40px; height: 54px; margin: -54px 0 0 -20px; pointer-events: auto; cursor: pointer;
+  transition: opacity .25s, filter .2s; will-change: transform; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .35)); padding: 0; }
+.pin svg { display: block; width: 100%; height: 100%; transition: transform .18s; transform-origin: 50% 100%; }
+.pin:hover svg, .pin.sel svg { transform: scale(1.22); }
+.pin.sel { z-index: 5; }
+.pin.oculto { opacity: 0; pointer-events: none; }
+.pin text { font: 700 15px "Segoe UI", system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; }
+
+/* panel de lugares */
+.panel { position: fixed; top: 14px; right: 14px; bottom: 14px; width: var(--ancho-panel); display: flex; flex-direction: column;
+  background: var(--panel); border-radius: var(--radio); box-shadow: var(--sombra); backdrop-filter: blur(10px); overflow: hidden; }
+.panel-asa { padding: 14px 18px 10px; text-align: left; font-weight: 700; font-size: 16px; border-bottom: 1px solid var(--borde); cursor: default; }
+.asa-barra { display: none; }
+.lista { list-style: none; margin: 0; padding: 6px 8px; overflow-y: auto; flex: 1; overscroll-behavior: contain; }
+.lista li { display: grid; grid-template-columns: 34px 1fr; gap: 2px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
+.lista li:hover { background: rgba(16, 17, 20, .05); }
+.lista li.sel { background: rgba(16, 17, 20, .09); }
+.lista .num { grid-row: span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px; }
+.lista b { font-weight: 600; }
+.lista small { color: var(--gris); font-size: 12.5px; }
+.lista .nivel { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; margin-left: 6px; white-space: nowrap; }
+.nota { margin: 0; padding: 8px 18px 12px; font-size: 11.5px; color: var(--gris); border-top: 1px solid var(--borde); }
+.ficha { display: none; }
+
+.ayuda { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); margin: 0; padding: 7px 14px; border-radius: 999px;
+  background: rgba(16, 17, 20, .72); color: #fff; font-size: 12.5px; white-space: nowrap; pointer-events: none; transition: opacity .6s; }
+.ayuda.fuera { opacity: 0; }
+
+/* carga */
+.carga { position: fixed; inset: 0; display: grid; place-content: center; gap: 8px; text-align: center; background: var(--tinta); color: #fff; z-index: 20; transition: opacity .5s; }
+.carga strong { font-size: 22px; letter-spacing: .06em; }
+.carga span { opacity: .7; }
+.carga .barra { width: 220px; height: 4px; margin: 10px auto 0; background: rgba(255, 255, 255, .18); border-radius: 4px; overflow: hidden; }
+.carga .barra i { display: block; height: 100%; width: 0; background: var(--rojo); transition: width .2s; }
+.carga.lista-ok { opacity: 0; pointer-events: none; }
+
+/* escritorio: el mapa se centra en el espacio libre a la izquierda del panel */
+@media (min-width: 821px) {
+  .modos { left: calc((100% - var(--ancho-panel) - 14px) / 2); }
+  .ayuda { left: calc((100% - var(--ancho-panel) - 14px) / 2); }
+}
+
+/* celular: el panel pasa a hoja inferior */
+@media (max-width: 820px) {
+  .pin { width: 32px; height: 43px; margin: -43px 0 0 -16px; }
+  .marca { padding: 8px 12px 9px; }
+  .marca strong { font-size: 14px; }
+  .marca span { font-size: 10.5px; }
+  .modos { top: auto; bottom: calc(var(--alto-hoja, 64px) + 12px); }
+  .modos button { padding: 8px 14px; font-size: 14px; }
+  .controles { bottom: calc(var(--alto-hoja, 64px) + 12px); }
+  .ayuda { top: calc(max(14px, env(safe-area-inset-top)) + 58px); bottom: auto; font-size: 11.5px; }
+  .panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 64vh; border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+  .panel-asa { display: grid; justify-items: center; gap: 6px; padding: 8px 16px 10px; text-align: center; font-size: 14.5px; cursor: pointer; border-bottom: 0; }
+  .asa-barra { display: block; width: 38px; height: 4px; border-radius: 4px; background: rgba(16, 17, 20, .22); }
+  .panel:not(.abierto) .lista, .panel:not(.abierto) .nota { display: none; }
+  .panel.abierto .ficha { display: none !important; }
+  .ficha:not([hidden]) { display: grid; grid-template-columns: 34px 1fr; gap: 2px 10px; align-items: center; padding: 2px 16px 12px; }
+  .ficha .num { grid-row: span 2; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px; }
+  .ficha small { color: var(--gris); font-size: 12.5px; }
+}
+
+/* capas Lugares / Stands y buscador */
+.capas { display: flex; gap: 4px; margin: 8px 12px 0; padding: 3px; border-radius: 999px; background: rgba(16, 17, 20, .06); }
+.capas[hidden] { display: none; }
+.capas button { flex: 1; padding: 6px 10px; border-radius: 999px; font-weight: 600; font-size: 13.5px; color: var(--gris); }
+.capas button.activo { background: var(--tinta); color: #fff; }
+.buscar { margin: 8px 12px 2px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--borde); font: inherit; font-size: 14px; background: #fff; }
+.buscar[hidden], .lista[hidden] { display: none; }
+.lista .cod { grid-row: span 2; min-width: 30px; height: 26px; padding: 0 6px; border-radius: 7px; display: grid; place-items: center;
+  background: var(--tinta); color: #fff; font-weight: 700; font-size: 12px; }
+.punto { position: absolute; left: 0; top: 0; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--tinta);
+  border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); pointer-events: auto; padding: 0; transition: opacity .25s; }
+.punto.sel { background: var(--rojo); width: 18px; height: 18px; margin: -9px 0 0 -9px; z-index: 6; }
+.punto.oculto { opacity: 0; pointer-events: none; }
+@media (max-width: 820px) {
+  .panel:not(.abierto) .capas, .panel:not(.abierto) .buscar { display: none; }
+}

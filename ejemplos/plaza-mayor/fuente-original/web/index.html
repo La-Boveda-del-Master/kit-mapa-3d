@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Mapa Feria Effix 2026 · Plaza Mayor Medellín</title>
+<meta name="description" content="Mapa 3D navegable de Feria Effix 2026 en Plaza Mayor Medellín: pabellones, auditorios, ingreso y taquillas.">
+<meta name="theme-color" content="#101114">
+<link rel="stylesheet" href="estilos.css?v=1791414098">
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="lienzo" aria-label="Mapa 3D de la feria"></canvas>
+<div id="pines" aria-hidden="true"></div>
+
+<header class="marca">
+  <div class="marca-txt">
+    <strong>FERIA EFFIX 2026</strong>
+    <span>Plaza Mayor Medellín · 15 al 18 de octubre</span>
+  </div>
+</header>
+
+<nav class="modos" role="tablist" aria-label="Modo de vista">
+  <button id="modo-exterior" role="tab" aria-selected="true" class="activo">Exterior</button>
+  <button id="modo-niveles" role="tab" aria-selected="false">Por niveles</button>
+</nav>
+
+<div class="controles">
+  <button id="btn-inicio" title="Volver a la vista inicial" aria-label="Volver a la vista inicial">
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 11.5 12 4l9 7.5M6 10v9h4.5v-5h3v5H18v-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button id="btn-girar" title="Recorrido automático" aria-label="Recorrido automático" aria-pressed="false">
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v4.5h-4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <button id="btn-planta" title="Vista desde arriba" aria-label="Vista desde arriba">
+    <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 7l8-4 8 4-8 4-8-4zm0 5l8 4 8-4M4 17l8 4 8-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+</div>
+
+<aside id="panel" class="panel" aria-label="Lugares de la feria">
+  <button id="panel-asa" class="panel-asa" aria-expanded="false">
+    <span class="asa-barra"></span>
+    <span id="asa-txt">Lugares de la feria</span>
+  </button>
+  <div id="ficha" class="ficha" hidden></div>
+  <ol id="lista" class="lista"></ol>
+  <p class="nota">Escala según plano técnico. Alturas y entorno aproximados.</p>
+</aside>
+
+<p id="ayuda" class="ayuda">Arrastra para girar · rueda o pellizco para acercar · toca un número</p>
+
+<div id="carga" class="carga">
+  <strong>FERIA EFFIX 2026</strong>
+  <span>Cargando mapa 3D…</span>
+  <div class="barra"><i id="carga-barra"></i></div>
+</div>
+
+<script type="module" src="app.js?v=1791414098"></script>
+</body>
+</html>
