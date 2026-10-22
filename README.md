@@ -67,6 +67,11 @@ blender -b ejemplos/oficina-demo/salida/modelo.blend --python pipeline/exportar_
 python -m http.server 8766 --directory ejemplos/oficina-demo/salida/web
 ```
 
+## Licencia
+
+[MIT](LICENSE): úsalo, cámbialo y compártelo, también en proyectos comerciales, manteniendo el aviso de copyright.
+Los decodificadores Draco de `visor/draco/` son de Google (Apache 2.0) y three.js se carga desde su CDN (MIT).
+
 ---
 
 Parte de **La Bóveda del Master**: recursos que regala [Alexander Cast](https://github.com/AlexanderKast).
